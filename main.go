@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	. "terminus/models"
+	. "lazychain/models"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

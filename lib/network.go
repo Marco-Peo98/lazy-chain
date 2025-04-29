@@ -16,16 +16,36 @@ type NetworkConfig struct {
 	NodePort  string
 }
 
-var (
-	ALGOD_ADDRESS = "http://localhost"
-	ALGOD_PORT    = "4001"
-	ALGOD_URL     = ""
-	ALGOD_TOKEN   = strings.Repeat("a", 64)
 
-	INDEXER_ADDRESS = "http://localhost"
-	INDEXER_PORT    = "8980"
-	INDEXER_TOKEN   = strings.Repeat("a", 64)
-	INDEXER_URL     = ""
+const (
+	LOCALNET 	= "localnet"
+	MAINNET 	= "mainnet"
+	TESTNET 	= "testnet"
+	FNET 		= "fnet"
+)
+
+var (
+	LOCALNET_ALGOD_ADDRESS = "http://localhost"
+	LOCALNET_ALGOD_PORT    = "4001"
+	LOCALNET_ALGOD_URL     = ""
+	LOCALNET_ALGOD_TOKEN   = strings.Repeat("a", 64)
+
+	LOCALNET_INDEXER_ADDRESS = "http://localhost"
+	LOCALNET_INDEXER_PORT    = "8980"
+	LOCALNET_INDEXER_TOKEN   = strings.Repeat("a", 64)
+	LOCALNET_INDEXER_URL     = ""
+
+	MAINNET_ALGOD_ADDRESS	= "https://mainnet-api.algonode.cloud/"
+	MAINNET_ALGOD_PORT		= "443"
+	MAINNET_ALGOD_TOKEN		= ""
+
+	MAINNET_INDEXER_ADDRESS = "https://mainnet-idx.algonode.cloud/"
+	MAINNET_INDEXER_PORT	= "443"
+	MAINNET_INDEXER_TOKEN	= ""
+
+	TESTNET_ALGOD_ADDRESS	= "https://testnet-api.algonode.cloud/"
+	TESTNET_ALGOD_PORT		= "443"
+	TESTNET_ALGOD_TOKEN		= ""
 
 	KMD_ADDRESS = "http://localhost"
 	KMD_PORT    = "4002"
@@ -39,41 +59,83 @@ var (
 	LORA_WALLET_PASSWORD	= ""
 )
 
+func (c *AlgoClient) ConnectNetwork(name string) {
+	switch name {
+	case LOCALNET: 
+		netCfg := NetworkConfig {
+			LOCALNET_ALGOD_ADDRESS,
+			LOCALNET_ALGOD_PORT,
+			LOCALNET_ALGOD_TOKEN,
+		}
+		rest, err := GetAlgodClient(netCfg)
+		if err != nil {
+			fmt.Println("did not connect, problem at connection with network", name)
+		}
+		c.algod = rest
+		break
+	case MAINNET:
+		netCfg := NetworkConfig {
+			MAINNET_ALGOD_ADDRESS,
+			MAINNET_ALGOD_PORT,
+			MAINNET_ALGOD_TOKEN,
+		}
+		rest, err := GetAlgodClient(netCfg)
+		if err != nil {
+			fmt.Println("did not connect, problem at connection with network", name)
+		}
+		c.algod = rest
+		break
+	case TESTNET:
+		netCfg := NetworkConfig {
+			TESTNET_ALGOD_ADDRESS,
+			TESTNET_ALGOD_PORT,
+			TESTNET_ALGOD_TOKEN,
+		}
+		rest, err := GetAlgodClient(netCfg)
+		if err != nil {
+			fmt.Println("did not connect, problem at connection with network", name)
+		}
+		c.algod = rest
+		break
+	}
+
+}
+
 func GetAlgodClient(network NetworkConfig) (*algod.Client, error) {
-	ALGOD_URL = fmt.Sprintf("%s%s", network.NodeAddress, network.NodePort)
-	ALGOD_TOKEN = network.NodeToken
+	url := fmt.Sprintf("%s%s", network.NodeAddress, network.NodePort)
+	token := network.NodeToken
 	algod, err := algod.MakeClient(
-		ALGOD_URL,
-		ALGOD_TOKEN,
+		url,
+		token,
 	)
 	return algod, err
 }
 
 func GetIndexerClient(network NetworkConfig) (*indexer.Client, error) {
-	INDEXER_URL = fmt.Sprintf("%s%s", network.NodeAddress, network.NodePort)
-	INDEXER_TOKEN = network.NodeToken
+	url := fmt.Sprintf("%s%s", network.NodeAddress, network.NodePort)
+	token := network.NodeToken
 	indexer, err := indexer.MakeClient(
-		INDEXER_URL,
-		INDEXER_TOKEN,
+		url,
+		token,
 	)
 	return indexer, err
 }
 
 func GetKmdClient(network NetworkConfig) (kmd.Client, error) {
-	KMD_URL = fmt.Sprintf("%s%s", network.NodeAddress, network.NodePort)
-	KMD_TOKEN = network.NodeToken
+	url := fmt.Sprintf("%s%s", network.NodeAddress, network.NodePort)
+	token := network.NodeToken
 	kmd, err := kmd.MakeClient(
-		KMD_URL,
-		KMD_TOKEN,
+		url,
+		token,
 	)
 	return kmd, err
 }
 
-func GetSandboxAccounts() ([]crypto.Account, error) {
+func GetKmdAccounts() ([]crypto.Account, error) {
 	localnet := NetworkConfig{
-		ALGOD_ADDRESS,
-		ALGOD_TOKEN,
-		ALGOD_PORT	}
+		LOCALNET_ALGOD_ADDRESS,
+		LOCALNET_ALGOD_TOKEN,
+		LOCALNET_ALGOD_PORT	}
 
 	client, err := GetKmdClient(localnet)
 
@@ -82,92 +144,42 @@ func GetSandboxAccounts() ([]crypto.Account, error) {
 		return nil, fmt.Errorf("Failed to list wallets: %+v", err)
 	}
 
-	var walletId string
-	for _, wallet := range resp.Wallets {
-		if wallet.Name == KMD_WALLET_NAME {
-			walletId = wallet.ID
-		}
+	var walletId []string = make([]string, len(resp.Wallets))
+	for i, wallet := range resp.Wallets {
+		walletId[i] = wallet.ID
 	}
 
-	if walletId == "" {
+	if len(walletId) == 0 {
 		return nil, fmt.Errorf("No wallet named %s", KMD_WALLET_NAME)
 	}
 
-	whResp, err := client.InitWalletHandle(walletId, KMD_WALLET_PASSWORD)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to init wallet handle: %+v", err)
-	}
-
-	addrResp, err := client.ListKeys(whResp.WalletHandleToken)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to list keys: %+v", err)
-	}
-
+	
 	var accts []crypto.Account
-	for _, addr := range addrResp.Addresses {
-		expResp, err := client.ExportKey(whResp.WalletHandleToken, KMD_WALLET_PASSWORD, addr)
+
+	for _, id := range walletId {
+		whResp, err := client.InitWalletHandle(id, KMD_WALLET_PASSWORD)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to export key: %+v", err)
+			return nil, fmt.Errorf("Failed to init wallet handle: %+v", err)
 		}
 
-		acct, err := crypto.AccountFromPrivateKey(expResp.PrivateKey)
+		addrResp, err := client.ListKeys(whResp.WalletHandleToken)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to create account from private key: %+v", err)
+			return nil, fmt.Errorf("Failed to list keys: %+v", err)
 		}
 
-		accts = append(accts, acct)
-	}
+		for _, addr := range addrResp.Addresses {
+			expResp, err := client.ExportKey(whResp.WalletHandleToken, KMD_WALLET_PASSWORD, addr)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to export key: %+v", err)
+			}
 
-	return accts, nil
-}
+			acct, err := crypto.AccountFromPrivateKey(expResp.PrivateKey)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to create account from private key: %+v", err)
+			}
 
-func GetLoraAccounts() ([]crypto.Account, error) {
-	localnet := NetworkConfig{
-		ALGOD_ADDRESS,
-		ALGOD_TOKEN,
-		ALGOD_PORT	}
-
-	client, err := GetKmdClient(localnet)
-
-	resp, err := client.ListWallets()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to list wallets: %+v", err)
-	}
-
-	var walletId string
-	for _, wallet := range resp.Wallets {
-		if wallet.Name == LORA_WALLET_NAME {
-			walletId = wallet.ID
+			accts = append(accts, acct)
 		}
-	}
-
-	if walletId == "" {
-		return nil, fmt.Errorf("No wallet named %s", LORA_WALLET_NAME)
-	}
-
-	whResp, err := client.InitWalletHandle(walletId, LORA_WALLET_PASSWORD)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to init wallet handle: %+v", err)
-	}
-
-	addrResp, err := client.ListKeys(whResp.WalletHandleToken)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to list keys: %+v", err)
-	}
-
-	var accts []crypto.Account
-	for _, addr := range addrResp.Addresses {
-		expResp, err := client.ExportKey(whResp.WalletHandleToken, LORA_WALLET_PASSWORD, addr)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to export key: %+v", err)
-		}
-
-		acct, err := crypto.AccountFromPrivateKey(expResp.PrivateKey)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to create account from private key: %+v", err)
-		}
-
-		accts = append(accts, acct)
 	}
 
 	return accts, nil
