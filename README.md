@@ -10,7 +10,7 @@ Built with [BubbleTea](https://github.com/charmbracelet/bubbletea) and the offic
 
 - View accounts, transactions, and applications
 - Connect to different Algorand networks (MainNet, TestNet, etc.)
-- Interact with smart contracts (TEAL)
+- Interact with smart contracts (TEAL) (soon)
 - Configure and persist network settings
 - Lightweight and responsive terminal UI
 
@@ -18,7 +18,7 @@ Built with [BubbleTea](https://github.com/charmbracelet/bubbletea) and the offic
 
 ## 📸 Preview
 
-_Coming soon..._ (GIF or screenshot of the interface)
+_Coming soon...
 
 ---
 
@@ -29,7 +29,3 @@ _Coming soon..._ (GIF or screenshot of the interface)
 - **Algorand Go SDK** – Official SDK for blockchain interaction
 
 ---
-
-## 📁 Project Structure
-
-<pre> ```text . ├── lib/ # Algorand interaction logic │ ├── algo.go │ └── network.go ├── misc/ # Utility files (e.g., env vars) │ └── env.go ├── models/ # Application models and modules │ ├── accountList.go │ ├── applications.go │ ├── cmdGoals.go │ ├── explore.go │ ├── project.go │ ├── settings.go │ └── types.go ├── main.go # Entry point ├── lazychain.exe # Built executable (Windows) ├── go.mod / go.sum # Go dependencies ├── LICENSE └── README.md ``` </pre>
