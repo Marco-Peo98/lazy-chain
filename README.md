@@ -18,7 +18,8 @@ Built with [BubbleTea](https://github.com/charmbracelet/bubbletea) and the offic
 
 ## 📸 Preview
 
-_Coming soon...
+![alt text](image.png)
+![alt text](image-1.png)
 
 ---
 
