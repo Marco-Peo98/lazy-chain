@@ -1,17 +1,23 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	. "lazychain/models"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 var p *tea.Program
 
 var Focus string
 
+//go:embed banner.txt
+var banner string
+
 type MainModel struct {
+	width, height     int
 	CurrentState      SessionState
 	ProjectModel      *ProjectModel
 	SettingsModel     *SettingsModel
@@ -22,6 +28,8 @@ type MainModel struct {
 
 func NewMainModel() *MainModel {
 	return &MainModel{
+		width:             0,
+		height:            0,
 		CurrentState:      MainView,
 		ProjectModel:      NewProjectModel(),
 		SettingsModel:     NewSettingsModel(),
@@ -118,16 +126,44 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 		}
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
 	}
 
 	return m, nil
 }
 
 func (m *MainModel) View() string {
+
+	banner = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#81c8be")).
+		Render(banner)
+
+	mainTxt := lipgloss.NewStyle().
+		Align(lipgloss.Center).
+		Foreground(lipgloss.Color("#c6d0f5")).
+		Render("\n\nPress 'Enter' to start. \nPress 'q' or 'Ctrl+c' to quit.\n\n")
+
+	content := lipgloss.NewStyle().
+		Align(lipgloss.Center).
+		Render((banner + "\n\n" + mainTxt))
+
+	box := lipgloss.NewStyle().
+		Padding(1).
+		Margin(1).
+		Render(content)
+
+	container := lipgloss.Place(m.width, m.height,
+		lipgloss.Center,
+		lipgloss.Center,
+		box,
+	)
+
 	switch m.CurrentState {
 	case MainView:
-		return "Main View\n\nPress 'ENTER' to go to the project view.\nPress 'Ctrl+c' or 'q' to quit.\n"
-
+		return container
 	case ProjectView:
 		switch Focus {
 		case "SettingsView":
