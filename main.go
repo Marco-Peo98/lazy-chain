@@ -1,17 +1,23 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	. "lazychain/models"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 var p *tea.Program
 
 var Focus string
 
+//go:embed banner.txt
+var banner string
+
 type MainModel struct {
+	width, height     int
 	CurrentState      SessionState
 	ProjectModel      *ProjectModel
 	SettingsModel     *SettingsModel
@@ -22,6 +28,8 @@ type MainModel struct {
 
 func NewMainModel() *MainModel {
 	return &MainModel{
+		width:             0,
+		height:            0,
 		CurrentState:      MainView,
 		ProjectModel:      NewProjectModel(),
 		SettingsModel:     NewSettingsModel(),
@@ -38,8 +46,8 @@ func (m *MainModel) Init() tea.Cmd {
 func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if m.CurrentState == MainView {
-
+		switch m.CurrentState {
+		case MainView:
 			// When in the main view, every selection will be reset
 			m.ProjectModel.Selected = make(map[int]struct{})
 			m.ProjectModel.Cursor = 0
@@ -52,27 +60,40 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+c", "q":
 				return m, tea.Quit
 			}
-		} else if m.CurrentState == ProjectView {
+		case ProjectView:
 			switch msg.String() {
 			case "esc":
-				m.CurrentState = MainView
+				// Back to list if you're inside a subview
+				m.CurrentState = ProjectView
+				m.ProjectModel.Selected = make(map[int]struct{})
 				return m, nil
 			}
-			var cmd tea.Cmd
-			updatedModel, cmd := m.ProjectModel.Update(msg)
-			if updatedProjectModel, ok := updatedModel.(*ProjectModel); ok {
-				m.ProjectModel = updatedProjectModel
-			}
-			if cmd != nil {
-				if focusMsg, ok := cmd().(string); ok {
-					Focus = focusMsg
+
+			updateModel, cmd := m.ProjectModel.Update(msg)
+			if pm, ok := updateModel.(*ProjectModel); ok {
+				m.ProjectModel = pm
+
+				// Update the current state based on the selected option
+				if len(m.ProjectModel.Selected) > 0 {
+					for i := range m.ProjectModel.Selected {
+						switch m.ProjectModel.Options[i] {
+						case "Settings":
+							m.CurrentState = SettingsView
+						case "Applications":
+							m.CurrentState = ApplicationsView
+						case "Commands Goals":
+							m.CurrentState = CmdGoalsView
+						case "Explore":
+							m.CurrentState = ExploreView
+						}
+					}
 				}
 			}
 			return m, cmd
-		} else if m.CurrentState == SettingsView {
+		case SettingsView:
 			switch msg.String() {
 			case "esc":
-				m.CurrentState = MainView
+				m.CurrentState = ProjectView
 				return m, nil
 			}
 			var cmd tea.Cmd
@@ -81,10 +102,10 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.SettingsModel = updatedSettingsModel
 			}
 			return m, cmd
-		} else if m.CurrentState == ApplicationsView {
+		case ApplicationsView:
 			switch msg.String() {
 			case "esc":
-				m.CurrentState = MainView
+				m.CurrentState = ProjectView
 				return m, nil
 			}
 			var cmd tea.Cmd
@@ -93,10 +114,10 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.ApplicationsModel = updatedApplicationsModel
 			}
 			return m, cmd
-		} else if m.CurrentState == CmdGoalsView {
+		case CmdGoalsView:
 			switch msg.String() {
 			case "esc":
-				m.CurrentState = MainView
+				m.CurrentState = ProjectView
 				return m, nil
 			}
 			var cmd tea.Cmd
@@ -105,10 +126,10 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.CmdGoalsModel = updatedCmdGoalsModel
 			}
 			return m, cmd
-		} else if m.CurrentState == ExploreView {
+		case ExploreView:
 			switch msg.String() {
 			case "esc":
-				m.CurrentState = MainView
+				m.CurrentState = ProjectView
 				return m, nil
 			}
 			var cmd tea.Cmd
@@ -118,6 +139,10 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 		}
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
 	}
 
 	return m, nil
@@ -126,38 +151,25 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *MainModel) View() string {
 	switch m.CurrentState {
 	case MainView:
-		return "Main View\n\nPress 'ENTER' to go to the project view.\nPress 'Ctrl+c' or 'q' to quit.\n"
-
+		bannerStyled := lipgloss.NewStyle().Foreground(lipgloss.Color("#81c8be")).Render(banner)
+		instr := lipgloss.NewStyle().Align(lipgloss.Center).Foreground(lipgloss.Color("#c6d0f5")).Render("\nPress 'Enter' to start\nPress 'Ctrl+C' or 'q' to quit")
+		content := lipgloss.JoinVertical(lipgloss.Center, bannerStyled, instr)
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
+			lipgloss.NewStyle().Padding(1).Render(content),
+		)
 	case ProjectView:
-		switch Focus {
-		case "SettingsView":
-			return fmt.Sprintf(
-				"%s\n\n%s",
-				m.ProjectModel.View(),
-				m.SettingsModel.View(),
-			)
-		case "ApplicationsView":
-			return fmt.Sprintf(
-				"%s\n\n%s",
-				m.ProjectModel.View(),
-				m.ApplicationsModel.View(),
-			)
-		case "Commands GoalsView":
-			return fmt.Sprintf(
-				"%s\n\n%s",
-				m.ProjectModel.View(),
-				m.CmdGoalsModel.View(),
-			)
-		case "ExploreView":
-			return fmt.Sprintf(
-				"%s\n\n%s",
-				m.ProjectModel.View(),
-				m.ExploreModel.View(),
-			)
-		default:
-			return m.ProjectModel.View()
-		}
-
+		return lipgloss.Place(m.width, m.height,
+			lipgloss.Center, lipgloss.Center,
+			m.ProjectModel.View(),
+		)
+	case SettingsView:
+		return m.SettingsModel.View()
+	case ApplicationsView:
+		return m.ApplicationsModel.View()
+	case CmdGoalsView:
+		return m.CmdGoalsModel.View()
+	case ExploreView:
+		return m.ExploreModel.View()
 	default:
 		return ""
 	}

@@ -1,9 +1,11 @@
 package models
 
 import (
+	"container/list"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // ProjectModel is the first real accessible model for the user
@@ -49,9 +51,7 @@ func (m *ProjectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Cursor++
 			}
 		case "enter", " ":
-			return m, func() tea.Msg {
-				return HandlePreview(m.Cursor, m.Options, m.Selected)
-			}
+			HandlePreview(m.Cursor, m.Options, m.Selected)
 		}
 	}
 
@@ -62,43 +62,92 @@ func (m *ProjectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // After the user selects an option, the focus has to move to the Selected option's view
 
 func (m *ProjectModel) View() string {
-	// Header of the list
-	s := "Which option do you want to select?\n\n"
 
-	// Iterate over the list of Options
+	// Create a new list to store the options with their selected state
+	row := list.New()
+
 	for i, option := range m.Options {
-		// Cursor position
-		Cursor := " " // No Cursor
+		// Subtitle for each option
+		desc := subtitleFor(option)
+
+		// Styles for title and subtitle
+		titleStyled := lipgloss.NewStyle().Bold(true).Render(option)
+		descStyled := lipgloss.NewStyle().Italic(true).Render(desc)
+
+		block := fmt.Sprintf("%s\n%s\n", titleStyled, descStyled)
+
+		style := lipgloss.NewStyle().Foreground(lipgloss.Color("#c6d0f5")).Padding(0, 1)
+
 		if m.Cursor == i {
-			Cursor = ">" // Cursor
+			style = style.Copy().
+				Foreground(lipgloss.Color("#ef9f76")).
+				BorderLeft(true).
+				BorderLeftForeground(lipgloss.Color("#ef9f76"))
 		}
 
-		Selected := " "
-		if _, ok := m.Selected[i]; ok {
-			Selected = "x"
-		}
-
-		s += fmt.Sprintf("%s [%s] %s\n", Cursor, Selected, option)
+		r := style.Render(block)
+		row.PushBack(r)
 	}
 
-	return s + "\nPress q to quit.\n"
+	// Vertical wrapper for the list items
+	var items []string
+	for e := row.Front(); e != nil; e = e.Next() {
+		if str, ok := e.Value.(string); ok {
+			items = append(items, str)
+		}
+	}
+	listCol := lipgloss.JoinVertical(lipgloss.Left, items...)
+	listBox := lipgloss.NewStyle().
+		Align(lipgloss.Left).
+		Padding(1, 2).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#ca9ee6")).
+		Render(listCol)
+
+	// Dynamic preview
+	current := m.Options[m.Cursor]
+	prevTitle := lipgloss.NewStyle().Bold(true).Render(current)
+	prevDesc := lipgloss.NewStyle().Italic(true).Render(subtitleFor(current))
+	previewText := fmt.Sprintf(
+		"Preview of: %s\n\n%s\n\nComing soon...\n\n",
+		prevTitle, prevDesc,
+	)
+	previewBox := lipgloss.NewStyle().
+		Align(lipgloss.Left).
+		Padding(1, 2).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#89b4fa")).
+		Render(previewText)
+
+	return lipgloss.JoinHorizontal(lipgloss.Top, listBox, previewBox)
+}
+
+// subtitleFor returns the subtitle for the given option
+func subtitleFor(option string) string {
+	switch option {
+	case "Settings":
+		return "Configure your settings"
+	case "Applications":
+		return "Manage your applications"
+	case "Commands Goals":
+		return "Define your objectives from shell"
+	case "Explore":
+		return "Explore other infos and resources"
+	default:
+		return ""
+	}
 }
 
 // User can select only one option at a time
 // If user selects more than one option, the last one will be the Selected one
 // and the previous ones will be unSelected
 
-func HandlePreview(Cursor int, Options []string, Selected map[int]struct{}) tea.Msg {
+func HandlePreview(Cursor int, Options []string, Selected map[int]struct{}) {
 
-	if _, ok := Selected[Cursor]; ok {
-		// Unselect all previous options
-		for i := range Selected {
-			if i != Cursor {
-				delete(Selected, i)
-			}
-		}
+	// Reset the previous selected option, maintaining the current one
+	for k := range Selected {
+		delete(Selected, k)
 	}
-	// Select the current option
+
 	Selected[Cursor] = struct{}{}
-	return Options[Cursor] + "View"
 }
