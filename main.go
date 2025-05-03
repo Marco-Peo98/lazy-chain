@@ -13,7 +13,7 @@ var p *tea.Program
 
 var Focus string
 
-//go:embed banner.txt
+//go:embed misc/banner.txt
 var banner string
 
 type MainModel struct {
