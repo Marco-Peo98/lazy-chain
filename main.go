@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	. "lazychain/models"
+	. "lazychain/models/settings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -32,7 +33,7 @@ func NewMainModel() *MainModel {
 		height:            0,
 		CurrentState:      MainView,
 		ProjectModel:      NewProjectModel(),
-		SettingsModel:     NewSettingsModel(),
+		SettingsModel:     NewSettingsModel([]string{"localnet", "testnet", "mainnet"}),
 		ApplicationsModel: NewApplicationsModel(),
 		CmdGoalsModel:     NewCmdGoalsModel(),
 		ExploreModel:      NewExploreModel(),
