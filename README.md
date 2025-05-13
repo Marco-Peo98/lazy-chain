@@ -6,6 +6,19 @@ Built with [BubbleTea](https://github.com/charmbracelet/bubbletea) and the offic
 
 ---
 
+## 📥 Installation
+
+Download the latest binary (lazychain.exe or lazychain) directly from the root of the repository:
+# For Windows
+wget https://github.com/VKappaKV/lazy-chain/raw/main/lazychain.exe -O lazychain.exe
+chmod +x lazychain.exe
+
+# For Linux/macOS (if a Unix binary is available)
+wget https://github.com/VKappaKV/lazy-chain/raw/main/lazychain -O lazychain
+chmod +x lazychain
+
+---
+
 ## ✨ Features
 
 - View accounts, transactions, and applications
@@ -23,10 +36,28 @@ Built with [BubbleTea](https://github.com/charmbracelet/bubbletea) and the offic
 
 ---
 
+## 🗂️ Repository Structure
+
+- lib/: Core logic for interacting with the Algorand Go SDK.
+- models/: Definitions of data structures (accounts, transactions, applications).
+- misc/: Utility functions, parsing, and CLI configuration.
+- preview/: Demonstrative screenshots of the TUI interface.
+- main.go: Entry point that sets up BubbleTea and launches the application.
+- lazychain.exe / lazychain: Precompiled executable ready to use.
+
+
+---
+
 ## 🛠️ Built With
 
 - **Go** – Programming language
 - **BubbleTea** – TUI framework by Charm
 - **Algorand Go SDK** – Official SDK for blockchain interaction
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License.
 
 ---
