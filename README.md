@@ -11,13 +11,8 @@ Built with [BubbleTea](https://github.com/charmbracelet/bubbletea) and the offic
 Download the latest binary (lazychain.exe or lazychain) directly from the root of the repository:
 
 ```bash
-# For Windows
 wget https://github.com/VKappaKV/lazy-chain/raw/main/lazychain.exe -O lazychain.exe
 chmod +x lazychain.exe
-
-# For Linux/macOS (if a Unix binary is available)
-wget https://github.com/VKappaKV/lazy-chain/raw/main/lazychain -O lazychain
-chmod +x lazychain
 ```
 
 ### Clone the repository
