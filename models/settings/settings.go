@@ -39,7 +39,7 @@ func NewSettingsModel(networks []string) *SettingsModel {
 		networks:    networks,
 		cursor:      cursor,
 		editingAddr: false,
-		inputBuffer: cfg.WalletAddr,
+		inputBuffer: "",
 	}
 }
 
@@ -50,32 +50,23 @@ func (m *SettingsModel) Init() tea.Cmd {
 func (m *SettingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "up":
-			if !m.editingAddr && m.cursor > 0 {
-				m.cursor--
-			}
-		case "down":
-			if !m.editingAddr && m.cursor < len(m.networks)-1 {
-				m.cursor++
-			}
-		case "enter":
-			if m.editingAddr {
+		// Handle input when in editing mode
+		if m.editingAddr {
+			switch msg.String() {
+			case "enter":
+				// Save the address and exit editing mode
 				m.config.WalletAddr = m.inputBuffer
 				m.editingAddr = false
 				SaveConfig(m.config)
-			} else {
-				m.config.Network = m.networks[m.cursor]
-				SaveConfig(m.config)
+				return m, nil
+			case "esc":
+				// Cancel editing and restore previous value
+				m.editingAddr = false
+				m.inputBuffer = ""
+				return m, nil
 			}
-		case "e":
-			m.editingAddr = true
-			m.inputBuffer = m.config.WalletAddr
-		case "esc":
-			return m, tea.Quit
-		}
 
-		if m.editingAddr {
+			// Handle character input
 			switch msg.Type {
 			case tea.KeyRunes:
 				m.inputBuffer += string(msg.Runes)
@@ -84,10 +75,45 @@ func (m *SettingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.inputBuffer = m.inputBuffer[:len(m.inputBuffer)-1]
 				}
 			}
+			return m, nil
+		}
+
+		// Handle input when NOT in editing mode
+		switch msg.String() {
+		case "up":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "down":
+			if m.cursor < len(m.networks)-1 {
+				m.cursor++
+			}
+		case "enter":
+			// Select network
+			m.config.Network = m.networks[m.cursor]
+			SaveConfig(m.config)
+		case "e":
+			// Enter editing mode for wallet address
+			m.editingAddr = true
+			m.inputBuffer = m.config.WalletAddr // Start with current address
+			// ESC is NOT handled here when not in editing mode
+			// This allows the MainModel to handle it and change views
 		}
 	}
 
 	return m, nil
+}
+
+// ResetEditingState ensures the settings model is not in editing mode
+// This should be called when entering or leaving the settings view
+func (m *SettingsModel) ResetEditingState() {
+	m.editingAddr = false
+	m.inputBuffer = ""
+}
+
+// IsEditingAddr returns true if the model is currently in address editing mode
+func (m *SettingsModel) IsEditingAddr() bool {
+	return m.editingAddr
 }
 
 func (m *SettingsModel) View() string {
@@ -104,7 +130,7 @@ func (m *SettingsModel) View() string {
 
 	if m.editingAddr {
 		s += fmt.Sprintf("\nWallet Address: %s_\n", m.inputBuffer)
-		s += "(Enter to save)"
+		s += "(Enter to save, ESC to cancel)"
 	} else {
 		s += fmt.Sprintf("\nWallet Address: %s\n", m.config.WalletAddr)
 		s += "Press 'e' to edit"

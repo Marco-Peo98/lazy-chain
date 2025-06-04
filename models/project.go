@@ -51,7 +51,9 @@ func (m *ProjectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Cursor++
 			}
 		case "enter", " ":
-			HandlePreview(m.Cursor, m.Options, m.Selected)
+			// Clear any previous selection and select current item
+			m.Selected = make(map[int]struct{})
+			m.Selected[m.Cursor] = struct{}{}
 		}
 	}
 
@@ -109,7 +111,7 @@ func (m *ProjectModel) View() string {
 	prevTitle := lipgloss.NewStyle().Bold(true).Render(current)
 	prevDesc := lipgloss.NewStyle().Italic(true).Render(subtitleFor(current))
 	previewText := fmt.Sprintf(
-		"Preview of: %s\n\n%s\n\nComing soon...\n\n",
+		"Preview of: %s\n\n%s\n\nPress ENTER to select\nPress ESC to go back\n\n",
 		prevTitle, prevDesc,
 	)
 	previewBox := lipgloss.NewStyle().
@@ -126,28 +128,17 @@ func (m *ProjectModel) View() string {
 func subtitleFor(option string) string {
 	switch option {
 	case "Settings":
-		return "Configure your settings"
+		return "Configure your network and wallet settings"
 	case "Applications":
-		return "Manage your applications"
+		return "Manage your blockchain applications"
 	case "Commands Goals":
 		return "Define your objectives from shell"
 	case "Explore":
-		return "Explore other infos and resources"
+		return "Explore blockchain data and resources"
 	default:
 		return ""
 	}
 }
 
-// User can select only one option at a time
-// If user selects more than one option, the last one will be the Selected one
-// and the previous ones will be unSelected
-
-func HandlePreview(Cursor int, Options []string, Selected map[int]struct{}) {
-
-	// Reset the previous selected option, maintaining the current one
-	for k := range Selected {
-		delete(Selected, k)
-	}
-
-	Selected[Cursor] = struct{}{}
-}
+// HandlePreview function is no longer needed since selection logic is handled directly in Update
+// This was causing the double-ESC issue

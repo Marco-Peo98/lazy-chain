@@ -64,8 +64,8 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ProjectView:
 			switch msg.String() {
 			case "esc":
-				// Back to list if you're inside a subview
-				m.CurrentState = ProjectView
+				// Back to main view - completely reset selection state
+				m.CurrentState = MainView
 				m.ProjectModel.Selected = make(map[int]struct{})
 				return m, nil
 			}
@@ -75,11 +75,14 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.ProjectModel = pm
 
 				// Update the current state based on the selected option
-				if len(m.ProjectModel.Selected) > 0 {
+				// Only change state if there's exactly one selection
+				if len(m.ProjectModel.Selected) == 1 {
 					for i := range m.ProjectModel.Selected {
 						switch m.ProjectModel.Options[i] {
 						case "Settings":
 							m.CurrentState = SettingsView
+							// Reset editing state when entering settings
+							m.SettingsModel.ResetEditingState()
 						case "Applications":
 							m.CurrentState = ApplicationsView
 						case "Commands Goals":
@@ -87,21 +90,32 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						case "Explore":
 							m.CurrentState = ExploreView
 						}
+						// Clear selection after state change to prevent re-triggering
+						m.ProjectModel.Selected = make(map[int]struct{})
+						break
 					}
 				}
 			}
 			return m, cmd
 		case SettingsView:
-			switch msg.String() {
-			case "esc":
-				m.CurrentState = ProjectView
-				return m, nil
-			}
+			// Check if we're in editing mode BEFORE processing the message
+			wasEditingAddr := m.SettingsModel.IsEditingAddr()
+
+			// Let the SettingsModel handle the message
 			var cmd tea.Cmd
 			updatedModel, cmd := m.SettingsModel.Update(msg)
 			if updatedSettingsModel, ok := updatedModel.(*SettingsModel); ok {
 				m.SettingsModel = updatedSettingsModel
 			}
+
+			// Only handle ESC in MainModel if we were NOT in editing mode
+			if msg.String() == "esc" && !wasEditingAddr {
+				// Reset editing state when leaving settings
+				m.SettingsModel.ResetEditingState()
+				m.CurrentState = ProjectView
+				return m, nil
+			}
+
 			return m, cmd
 		case ApplicationsView:
 			switch msg.String() {
