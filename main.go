@@ -3,6 +3,7 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"lazychain/layout" // New simple layout package
 	. "lazychain/models"
 	. "lazychain/models/settings"
 
@@ -18,7 +19,8 @@ var Focus string
 var banner string
 
 type MainModel struct {
-	width, height     int
+	// Replace individual width/height with layout container
+	layout            *layout.LayoutContainer
 	CurrentState      SessionState
 	ProjectModel      *ProjectModel
 	SettingsModel     *SettingsModel
@@ -28,9 +30,11 @@ type MainModel struct {
 }
 
 func NewMainModel() *MainModel {
+	// Initialize with default dimensions, will be updated by first WindowSizeMsg
+	initialLayout := layout.NewLayoutContainer(80, 24)
+
 	return &MainModel{
-		width:             0,
-		height:            0,
+		layout:            initialLayout,
 		CurrentState:      MainView,
 		ProjectModel:      NewProjectModel(),
 		SettingsModel:     NewSettingsModel([]string{"localnet", "testnet", "mainnet"}),
@@ -155,8 +159,8 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		// Update the layout container with new dimensions
+		m.layout.Resize(msg.Width, msg.Height)
 		return m, nil
 	}
 
@@ -169,22 +173,30 @@ func (m *MainModel) View() string {
 		bannerStyled := lipgloss.NewStyle().Foreground(lipgloss.Color("#81c8be")).Render(banner)
 		instr := lipgloss.NewStyle().Align(lipgloss.Center).Foreground(lipgloss.Color("#c6d0f5")).Render("\nPress 'Enter' to start\nPress 'Ctrl+C' or 'q' to quit")
 		content := lipgloss.JoinVertical(lipgloss.Center, bannerStyled, instr)
-		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center,
-			lipgloss.NewStyle().Padding(1).Render(content),
-		)
+
+		// Use layout container to render main view
+		return m.layout.Render(content)
+
 	case ProjectView:
-		return lipgloss.Place(m.width, m.height,
-			lipgloss.Center, lipgloss.Center,
-			m.ProjectModel.View(),
-		)
+		// Use layout container to render project view
+		return m.layout.Render(m.ProjectModel.View())
+
 	case SettingsView:
-		return m.SettingsModel.View()
+		// Use layout container to render settings view
+		return m.layout.Render(m.SettingsModel.View())
+
 	case ApplicationsView:
-		return m.ApplicationsModel.View()
+		// Use layout container to render applications view
+		return m.layout.Render(m.ApplicationsModel.View())
+
 	case CmdGoalsView:
-		return m.CmdGoalsModel.View()
+		// Use layout container to render cmd goals view
+		return m.layout.Render(m.CmdGoalsModel.View())
+
 	case ExploreView:
-		return m.ExploreModel.View()
+		// Use layout container to render explore view
+		return m.layout.Render(m.ExploreModel.View())
+
 	default:
 		return ""
 	}

@@ -1,8 +1,7 @@
 package models
 
 import (
-	"container/list"
-	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -60,68 +59,144 @@ func (m *ProjectModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// ProjectView has to show the preview of each option's view while the user is hovering it
-// After the user selects an option, the focus has to move to the Selected option's view
-
 func (m *ProjectModel) View() string {
+	// Create two-column layout: Menu options (left) | Preview (right)
+	// Using same dimensions as SettingsModel for consistency
+	leftColumn := m.renderMenuSection()
+	rightColumn := m.renderPreviewSection()
 
-	// Create a new list to store the options with their selected state
-	row := list.New()
-
-	for i, option := range m.Options {
-		// Subtitle for each option
-		desc := subtitleFor(option)
-
-		// Styles for title and subtitle
-		titleStyled := lipgloss.NewStyle().Bold(true).Render(option)
-		descStyled := lipgloss.NewStyle().Italic(true).Render(desc)
-
-		block := fmt.Sprintf("%s\n%s\n", titleStyled, descStyled)
-
-		style := lipgloss.NewStyle().Foreground(lipgloss.Color("#c6d0f5")).Padding(0, 1)
-
-		if m.Cursor == i {
-			style = style.Copy().
-				Foreground(lipgloss.Color("#ef9f76")).
-				BorderLeft(true).
-				BorderLeftForeground(lipgloss.Color("#ef9f76"))
-		}
-
-		r := style.Render(block)
-		row.PushBack(r)
-	}
-
-	// Vertical wrapper for the list items
-	var items []string
-	for e := row.Front(); e != nil; e = e.Next() {
-		if str, ok := e.Value.(string); ok {
-			items = append(items, str)
-		}
-	}
-	listCol := lipgloss.JoinVertical(lipgloss.Left, items...)
-	listBox := lipgloss.NewStyle().
-		Align(lipgloss.Left).
-		Padding(1, 2).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#ca9ee6")).
-		Render(listCol)
-
-	// Dynamic preview
-	current := m.Options[m.Cursor]
-	prevTitle := lipgloss.NewStyle().Bold(true).Render(current)
-	prevDesc := lipgloss.NewStyle().Italic(true).Render(subtitleFor(current))
-	previewText := fmt.Sprintf(
-		"Preview of: %s\n\n%s\n\nPress ENTER to select\nPress ESC to go back\n\n",
-		prevTitle, prevDesc,
+	// Combine columns horizontally with same gap as SettingsModel
+	mainContent := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		leftColumn,
+		"  ", // Small gap between columns (same as SettingsModel)
+		rightColumn,
 	)
-	previewBox := lipgloss.NewStyle().
-		Align(lipgloss.Left).
-		Padding(1, 2).
+
+	// Add footer with instructions
+	footer := m.renderFooter()
+
+	// Combine everything vertically
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		mainContent,
+		"",
+		footer,
+	)
+}
+
+func (m *ProjectModel) renderMenuSection() string {
+	var content []string
+
+	// Section title
+	title := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#cba6f7")).
+		Render("Main Menu")
+	content = append(content, title)
+	content = append(content, "")
+
+	// Menu options
+	for i, option := range m.Options {
+		cursor := "  "
+		style := lipgloss.NewStyle()
+
+		// Show cursor for current option
+		if m.Cursor == i {
+			cursor = "> "
+			style = style.Foreground(lipgloss.Color("#ef9f76"))
+		}
+
+		// Style the option text
+		line := cursor + style.Render(option)
+		content = append(content, line)
+	}
+
+	// Add some spacing
+	for len(content) < 10 {
+		content = append(content, "")
+	}
+
+	// Create left panel with border (standardized dimensions with increased padding)
+	panelContent := strings.Join(content, "\n")
+	return lipgloss.NewStyle().
+		Width(30).  // Same as SettingsModel left panel
+		Padding(2). // Increased padding
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#89b4fa")).
-		Render(previewText)
+		Render(panelContent)
+}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, listBox, previewBox)
+func (m *ProjectModel) renderPreviewSection() string {
+	var content []string
+
+	// Section title
+	title := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#cba6f7")).
+		Render("Preview")
+	content = append(content, title)
+	content = append(content, "")
+
+	// Preview content for selected option
+	currentOption := m.Options[m.Cursor]
+
+	// Option name
+	optionStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#a6e3a1"))
+	content = append(content, optionStyle.Render(currentOption))
+	content = append(content, "")
+
+	// Option description
+	description := subtitleFor(currentOption)
+	descStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#cdd6f4"))
+
+	// Wrap description to fit in panel width (adjusted for increased padding)
+	wrappedDesc := wrapText(description, 37) // Adjusted for increased padding
+	for _, line := range wrappedDesc {
+		content = append(content, descStyle.Render(line))
+	}
+
+	content = append(content, "")
+
+	// Instructions
+	instrStyle := lipgloss.NewStyle().
+		Italic(true).
+		Foreground(lipgloss.Color("#6c7086"))
+	content = append(content, instrStyle.Render("Press ENTER to select"))
+	content = append(content, instrStyle.Render("Press ESC to go back"))
+
+	// Fill remaining space
+	for len(content) < 10 {
+		content = append(content, "")
+	}
+
+	// Create right panel with border (standardized dimensions with increased padding)
+	panelContent := strings.Join(content, "\n")
+	return lipgloss.NewStyle().
+		Width(45).  // Same as SettingsModel right panel
+		Padding(2). // Increased padding
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#a6e3a1")).
+		Render(panelContent)
+}
+
+func (m *ProjectModel) renderFooter() string {
+	instructions := []string{
+		"Up/Down: Navigate options",
+		"Enter: Select option",
+		"ESC: Back to main",
+	}
+
+	instructionText := strings.Join(instructions, " | ")
+	return lipgloss.NewStyle().
+		Width(77).              // Total width of both panels + gap (30+2+45)
+		Align(lipgloss.Center). // Center the footer text
+		Foreground(lipgloss.Color("#6c7086")).
+		Italic(true).
+		Render(instructionText)
 }
 
 // subtitleFor returns the subtitle for the given option
@@ -140,5 +215,40 @@ func subtitleFor(option string) string {
 	}
 }
 
-// HandlePreview function is no longer needed since selection logic is handled directly in Update
-// This was causing the double-ESC issue
+// wrapText wraps text to fit within specified width
+func wrapText(text string, width int) []string {
+	if len(text) <= width {
+		return []string{text}
+	}
+
+	var lines []string
+	words := strings.Fields(text)
+	var currentLine []string
+	currentLength := 0
+
+	for _, word := range words {
+		// Check if adding this word would exceed width
+		if currentLength+len(word)+len(currentLine) > width {
+			if len(currentLine) > 0 {
+				lines = append(lines, strings.Join(currentLine, " "))
+				currentLine = []string{word}
+				currentLength = len(word)
+			} else {
+				// Single word is too long, truncate it
+				lines = append(lines, word[:width-3]+"...")
+				currentLine = []string{}
+				currentLength = 0
+			}
+		} else {
+			currentLine = append(currentLine, word)
+			currentLength += len(word)
+		}
+	}
+
+	// Add remaining words
+	if len(currentLine) > 0 {
+		lines = append(lines, strings.Join(currentLine, " "))
+	}
+
+	return lines
+}
