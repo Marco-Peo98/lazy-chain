@@ -207,7 +207,7 @@ func subtitleFor(option string) string {
 	case "Applications":
 		return "Manage your blockchain applications"
 	case "Commands Goals":
-		return "Define your objectives from shell"
+		return "Why CLI when you can TUI? Build transactions easily"
 	case "Explore":
 		return "Explore blockchain data and resources"
 	default:

@@ -45,7 +45,7 @@ func NewMainModel() *MainModel {
 }
 
 func (m *MainModel) Init() tea.Cmd {
-	return nil
+	return tea.SetWindowTitle("LAZYCHAIN - your friendly TUI ≧ ﹏ ≦")
 }
 
 func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
