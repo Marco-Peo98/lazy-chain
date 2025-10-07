@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"lazychain/layout" // New simple layout package
 	. "lazychain/models"
+	. "lazychain/models/goal"
 	. "lazychain/models/settings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -25,7 +26,7 @@ type MainModel struct {
 	ProjectModel      *ProjectModel
 	SettingsModel     *SettingsModel
 	ApplicationsModel *ApplicationsModel
-	CmdGoalsModel     *CmdGoalsModel
+	CmdGoalsModel     *GOALModel
 	ExploreModel      *ExploreModel
 }
 
@@ -39,7 +40,7 @@ func NewMainModel() *MainModel {
 		ProjectModel:      NewProjectModel(),
 		SettingsModel:     NewSettingsModel([]string{"localnet", "testnet", "mainnet"}),
 		ApplicationsModel: NewApplicationsModel(),
-		CmdGoalsModel:     NewCmdGoalsModel(),
+		CmdGoalsModel:     NewGOALModel(),
 		ExploreModel:      NewExploreModel(),
 	}
 }
@@ -141,7 +142,7 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			var cmd tea.Cmd
 			updatedModel, cmd := m.CmdGoalsModel.Update(msg)
-			if updatedCmdGoalsModel, ok := updatedModel.(*CmdGoalsModel); ok {
+			if updatedCmdGoalsModel, ok := updatedModel.(*GOALModel); ok {
 				m.CmdGoalsModel = updatedCmdGoalsModel
 			}
 			return m, cmd
