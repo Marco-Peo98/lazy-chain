@@ -3,25 +3,30 @@ package main
 import (
 	_ "embed"
 	"fmt"
-	"lazychain/layout" // New simple layout package
+	"lazychain/layout" // Layout package
 	. "lazychain/models"
 	. "lazychain/models/goal"
 	. "lazychain/models/settings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 var p *tea.Program
-
 var Focus string
 
 //go:embed misc/banner.txt
 var banner string
 
 type MainModel struct {
-	// Replace individual width/height with layout container
-	layout            *layout.LayoutContainer
+	// Layout container (kept for non-converted views)
+	layoutContainer *layout.LayoutContainer
+
+	// FlexBox layouts
+	mainLayout *layout.MainLayout
+
+	// Current dimensions
+	width, height int
+
 	CurrentState      SessionState
 	ProjectModel      *ProjectModel
 	SettingsModel     *SettingsModel
@@ -31,11 +36,14 @@ type MainModel struct {
 }
 
 func NewMainModel() *MainModel {
-	// Initialize with default dimensions, will be updated by first WindowSizeMsg
+	// Initialize with default dimensions
 	initialLayout := layout.NewLayoutContainer(80, 24)
 
 	return &MainModel{
-		layout:            initialLayout,
+		layoutContainer:   initialLayout,
+		mainLayout:        nil, // Will be initialized on first WindowSizeMsg
+		width:             80,
+		height:            24,
 		CurrentState:      MainView,
 		ProjectModel:      NewProjectModel(),
 		SettingsModel:     NewSettingsModel([]string{"localnet", "testnet", "mainnet"}),
@@ -54,7 +62,7 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch m.CurrentState {
 		case MainView:
-			// When in the main view, every selection will be reset
+			// When in the main view, reset all selection state
 			m.ProjectModel.Selected = make(map[int]struct{})
 			m.ProjectModel.Cursor = 0
 			Focus = ""
@@ -86,7 +94,6 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						switch m.ProjectModel.Options[i] {
 						case "Settings":
 							m.CurrentState = SettingsView
-							// Reset editing state when entering settings
 							m.SettingsModel.ResetEditingState()
 						case "Applications":
 							m.CurrentState = ApplicationsView
@@ -160,8 +167,17 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	case tea.WindowSizeMsg:
-		// Update the layout container with new dimensions
-		m.layout.Resize(msg.Width, msg.Height)
+		// Update dimensions
+		m.width = msg.Width
+		m.height = msg.Height
+
+		// Update layout container (for non-converted views)
+		m.layoutContainer.Resize(msg.Width, msg.Height)
+
+		// Create/update MainLayout with new dimensions
+		instructions := "\nPress 'Enter' to start\nPress 'Ctrl+C' or 'q' to quit"
+		m.mainLayout = layout.NewMainLayout(msg.Width, msg.Height, banner, instructions)
+
 		return m, nil
 	}
 
@@ -171,32 +187,38 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *MainModel) View() string {
 	switch m.CurrentState {
 	case MainView:
-		bannerStyled := lipgloss.NewStyle().Foreground(lipgloss.Color("#81c8be")).Render(banner)
-		instr := lipgloss.NewStyle().Align(lipgloss.Center).Foreground(lipgloss.Color("#c6d0f5")).Render("\nPress 'Enter' to start\nPress 'Ctrl+C' or 'q' to quit")
-		content := lipgloss.JoinVertical(lipgloss.Center, bannerStyled, instr)
+		// Use FlexBox for MainView
+		if m.mainLayout == nil {
+			// Fallback if not yet initialized
+			instructions := "\nPress 'Enter' to start\nPress 'Ctrl+C' or 'q' to quit"
+			m.mainLayout = layout.NewMainLayout(m.width, m.height, banner, instructions)
+		}
 
-		// Use layout container to render main view
-		return m.layout.Render(content)
+		// IMPORTANT: Check if dimensions are valid
+		if !m.mainLayout.IsValid() {
+			// Show error message if terminal too small
+			return m.mainLayout.RenderError()
+		}
+
+		// Build and render FlexBox only if dimensions OK
+		flexBox := m.mainLayout.Build()
+		return flexBox.Render()
 
 	case ProjectView:
-		// Use layout container to render project view
-		return m.layout.Render(m.ProjectModel.View())
+		// Use layout container for now (will convert later)
+		return m.layoutContainer.Render(m.ProjectModel.View())
 
 	case SettingsView:
-		// Use layout container to render settings view
-		return m.layout.Render(m.SettingsModel.View())
+		return m.layoutContainer.Render(m.SettingsModel.View())
 
 	case ApplicationsView:
-		// Use layout container to render applications view
-		return m.layout.Render(m.ApplicationsModel.View())
+		return m.layoutContainer.Render(m.ApplicationsModel.View())
 
 	case CmdGoalsView:
-		// Use layout container to render cmd goals view
-		return m.layout.Render(m.CmdGoalsModel.View())
+		return m.layoutContainer.Render(m.CmdGoalsModel.View())
 
 	case ExploreView:
-		// Use layout container to render explore view
-		return m.layout.Render(m.ExploreModel.View())
+		return m.layoutContainer.Render(m.ExploreModel.View())
 
 	default:
 		return ""
