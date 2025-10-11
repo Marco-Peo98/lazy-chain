@@ -7,7 +7,7 @@ import (
 
 // Layout is the interface that all layout types must implement.
 type Layout interface {
-	Build(width, height int) *flexbox.Flexbox
+	Build(width, height int) *flexbox.FlexBox
 	GetMinDimensions() (width, height int)
 }
 
