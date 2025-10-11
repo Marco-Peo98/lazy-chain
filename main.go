@@ -215,31 +215,27 @@ func (m *MainModel) View() string {
 			m.projectLayout = layout.NewProjectLayout(m.width, m.height)
 		}
 
-		// Get current option for preview
-		currentOption := ""
-		if m.ProjectModel.Cursor < len(m.ProjectModel.Options) {
-			currentOption = m.ProjectModel.Options[m.ProjectModel.Cursor]
+		// Create preview generator function
+		previewGenerator := func(option string) layout.PreviewContent {
+			return layout.PreviewContent{
+				Title:        option,
+				Description:  subtitleFor(option),
+				Instructions: "Press ENTER to select\nPress ESC to go back",
+			}
 		}
 
-		// Get subtitle/description for current option
-		description := subtitleFor(currentOption)
-		instructions := "Press ENTER to select\nPress ESC to go back"
-
-		// Configure layout with current state
+		// Configure layout with all menu items (pre-calculates all previews)
 		m.projectLayout.
-			SetMenuItems(m.ProjectModel.Options).
-			SetCursor(m.ProjectModel.Cursor).
-			SetPreviewContent(currentOption, description, instructions)
+			SetMenuItems(m.ProjectModel.Options, previewGenerator).
+			SetCursor(m.ProjectModel.Cursor)
 
 		// Check dimensions
 		if !m.projectLayout.IsValid() {
-			// Reuse error from MainLayout or create simple message
-			return "Terminal too small for ProjectView\nMinimum: 80x24"
+			return m.projectLayout.RenderError()
 		}
 
-		// Build and render FlexBox
-		flexBox := m.projectLayout.Build()
-		return flexBox.Render()
+		// Render (includes centering with external padding)
+		return m.projectLayout.Render()
 
 	case SettingsView:
 		return m.layoutContainer.Render(m.SettingsModel.View())

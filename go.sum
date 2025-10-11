@@ -1,3 +1,5 @@
+github.com/76creates/stickers v1.5.0 h1:LJOlzeUbGOKBlsfi1UXShQiBh7IY7D9g5KTG7qltiFs=
+github.com/76creates/stickers v1.5.0/go.mod h1:S0ii0IRGMJx5n5zGpesai8oX0DWY3X5PDI3OUErgF38=
 github.com/algorand/avm-abi v0.2.0 h1:bkjsG+BOEcxUcnGSALLosmltE0JZdg+ZisXKx0UDX2k=
 github.com/algorand/avm-abi v0.2.0/go.mod h1:+CgwM46dithy850bpTeHh9MC99zpn2Snirb3QTl2O/g=
 github.com/algorand/go-algorand-sdk v1.24.0 h1:mi8vqjXMC5nU87snq4vxHi+NgPR0thtZHRLA16FKZMM=
