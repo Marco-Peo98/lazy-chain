@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/76creates/stickers v1.5.0 // indirect
 	github.com/algorand/avm-abi v0.2.0 // indirect
 	github.com/algorand/go-codec/codec v1.1.10 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
