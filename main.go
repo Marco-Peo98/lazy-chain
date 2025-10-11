@@ -22,7 +22,8 @@ type MainModel struct {
 	layoutContainer *layout.LayoutContainer
 
 	// FlexBox layouts
-	mainLayout *layout.MainLayout
+	mainLayout    *layout.MainLayout
+	projectLayout *layout.ProjectLayout
 
 	// Current dimensions
 	width, height int
@@ -42,6 +43,7 @@ func NewMainModel() *MainModel {
 	return &MainModel{
 		layoutContainer:   initialLayout,
 		mainLayout:        nil, // Will be initialized on first WindowSizeMsg
+		projectLayout:     nil, // Will be initialized on first WindowSizeMsg
 		width:             80,
 		height:            24,
 		CurrentState:      MainView,
@@ -178,6 +180,9 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		instructions := "\nPress 'Enter' to start\nPress 'Ctrl+C' or 'q' to quit"
 		m.mainLayout = layout.NewMainLayout(msg.Width, msg.Height, banner, instructions)
 
+		// Create/update ProjectLayout with new dimensions
+		m.projectLayout = layout.NewProjectLayout(msg.Width, msg.Height)
+
 		return m, nil
 	}
 
@@ -205,8 +210,36 @@ func (m *MainModel) View() string {
 		return flexBox.Render()
 
 	case ProjectView:
-		// Use layout container for now (will convert later)
-		return m.layoutContainer.Render(m.ProjectModel.View())
+		// Use FlexBox for ProjectView
+		if m.projectLayout == nil {
+			m.projectLayout = layout.NewProjectLayout(m.width, m.height)
+		}
+
+		// Get current option for preview
+		currentOption := ""
+		if m.ProjectModel.Cursor < len(m.ProjectModel.Options) {
+			currentOption = m.ProjectModel.Options[m.ProjectModel.Cursor]
+		}
+
+		// Get subtitle/description for current option
+		description := subtitleFor(currentOption)
+		instructions := "Press ENTER to select\nPress ESC to go back"
+
+		// Configure layout with current state
+		m.projectLayout.
+			SetMenuItems(m.ProjectModel.Options).
+			SetCursor(m.ProjectModel.Cursor).
+			SetPreviewContent(currentOption, description, instructions)
+
+		// Check dimensions
+		if !m.projectLayout.IsValid() {
+			// Reuse error from MainLayout or create simple message
+			return "Terminal too small for ProjectView\nMinimum: 80x24"
+		}
+
+		// Build and render FlexBox
+		flexBox := m.projectLayout.Build()
+		return flexBox.Render()
 
 	case SettingsView:
 		return m.layoutContainer.Render(m.SettingsModel.View())
@@ -220,6 +253,22 @@ func (m *MainModel) View() string {
 	case ExploreView:
 		return m.layoutContainer.Render(m.ExploreModel.View())
 
+	default:
+		return ""
+	}
+}
+
+// subtitleFor returns the subtitle for the given option
+func subtitleFor(option string) string {
+	switch option {
+	case "Settings":
+		return "Configure your network and wallet settings"
+	case "Applications":
+		return "Manage your blockchain applications"
+	case "Commands Goals":
+		return "Why CLI when you can TUI? Build transactions easily"
+	case "Explore":
+		return "Explore blockchain data and resources"
 	default:
 		return ""
 	}
