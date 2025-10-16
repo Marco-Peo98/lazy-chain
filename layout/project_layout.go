@@ -150,17 +150,14 @@ func (l *ProjectLayout) calculateMaxDimensions() {
 
 // Build constructs the FlexBox for ProjectView
 func (l *ProjectLayout) Build() *flexbox.FlexBox {
-	// Calculate box dimensions (terminal - external padding)
-	boxWidth := l.Width - (l.externalPadding * 2)
-	boxHeight := l.Height - (l.externalPadding * 2)
+	// Calculate exact width needed for each cell based on content
+	// These will be used as minWidth
+	menuMinWidth := l.maxMenuWidth
+	previewMinWidth := l.maxPreviewWidth
 
-	// Ensure minimum box size
-	if boxWidth < 70 {
-		boxWidth = 70
-	}
-	if boxHeight < 20 {
-		boxHeight = 20
-	}
+	// Total width = sum of minWidths + gap between cells
+	// FlexBox adds small gaps automatically, so add a bit of buffer
+	totalWidth := menuMinWidth + previewMinWidth + 4 // 4 chars for gaps/spacing
 
 	// Use the maximum height between menu and preview
 	maxCellHeight := l.maxMenuHeight
@@ -168,17 +165,22 @@ func (l *ProjectLayout) Build() *flexbox.FlexBox {
 		maxCellHeight = l.maxPreviewHeight
 	}
 
-	// If calculated height exceeds available space, use available space
-	if maxCellHeight > boxHeight {
-		maxCellHeight = boxHeight
-	}
+	// Create FlexBox with content-based width
+	box := flexbox.New(totalWidth, maxCellHeight)
 
-	// Create FlexBox with calculated dimensions
-	box := flexbox.New(boxWidth, maxCellHeight)
+	// Create cells with ratio 2:3 AND minWidth constraints
+	// This ensures ratio is maintained while respecting content size
+	menuCell := flexbox.NewCell(2, 1).
+		SetMinWidth(menuMinWidth). // ← FORCE minimum width based on content
+		SetContentGenerator(func(maxX, maxY int) string {
+			return l.renderMenuContent(maxX, maxY)
+		})
 
-	// Create cells with ratio 2:3 but they'll render at calculated widths
-	menuCell := l.createMenuCell()
-	previewCell := l.createPreviewCell()
+	previewCell := flexbox.NewCell(3, 1).
+		SetMinWidth(previewMinWidth). // ← FORCE minimum width based on content
+		SetContentGenerator(func(maxX, maxY int) string {
+			return l.renderPreviewContent(maxX, maxY)
+		})
 
 	// Create row with both cells
 	row := box.NewRow().AddCells(menuCell, previewCell)
@@ -266,6 +268,7 @@ func (l *ProjectLayout) renderMenuContent(maxX, maxY int) string {
 		Padding(1).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(BorderColorPrimary).
+		Background(lipgloss.Color("#1e3a5f")). // Dark blue background JUST FOR DEBUG
 		Render(panelContent)
 }
 
@@ -350,6 +353,7 @@ func (l *ProjectLayout) renderPreviewContent(maxX, maxY int) string {
 		Padding(1).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(BorderColorSecondary).
+		Background(lipgloss.Color("#1e3d2f")). // Dark green background JUST FOR DEBUG
 		Render(panelContent)
 }
 
