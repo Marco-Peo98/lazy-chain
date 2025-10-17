@@ -3,6 +3,7 @@ module lazychain
 go 1.24.0
 
 require (
+	github.com/76creates/stickers v1.5.0
 	github.com/algorand/go-algorand-sdk v1.24.0
 	github.com/algorand/go-algorand-sdk/v2 v2.8.0
 	github.com/charmbracelet/bubbles v0.21.0
