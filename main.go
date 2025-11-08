@@ -22,8 +22,9 @@ type MainModel struct {
 	layoutContainer *layout.LayoutContainer
 
 	// FlexBox layouts
-	mainLayout    *layout.MainLayout
-	projectLayout *layout.ProjectLayout
+	mainLayout     *layout.MainLayout
+	projectLayout  *layout.ProjectLayout
+	cmdGoalsLayout *layout.CmdGoalsLayout
 
 	// Current dimensions
 	width, height int
@@ -44,6 +45,7 @@ func NewMainModel() *MainModel {
 		layoutContainer:   initialLayout,
 		mainLayout:        nil, // Will be initialized on first WindowSizeMsg
 		projectLayout:     nil, // Will be initialized on first WindowSizeMsg
+		cmdGoalsLayout:    nil, // Will be initialized on first WindowSizeMsg
 		width:             80,
 		height:            24,
 		CurrentState:      MainView,
@@ -183,6 +185,9 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Create/update ProjectLayout with new dimensions
 		m.projectLayout = layout.NewProjectLayout(msg.Width, msg.Height)
 
+		// Create/update CmdGoalsLayout with new dimensions
+		m.cmdGoalsLayout = layout.NewCmdGoalsLayout(msg.Width, msg.Height)
+
 		return m, nil
 	}
 
@@ -244,7 +249,24 @@ func (m *MainModel) View() string {
 		return m.layoutContainer.Render(m.ApplicationsModel.View())
 
 	case CmdGoalsView:
-		return m.layoutContainer.Render(m.CmdGoalsModel.View())
+		// Use FlexBox for CmdGoalsView
+		if m.cmdGoalsLayout == nil {
+			m.cmdGoalsLayout = layout.NewCmdGoalsLayout(m.width, m.height)
+		}
+
+		// Configure layout with data from GOALModel
+		m.cmdGoalsLayout.
+			SetTxnTypes(m.CmdGoalsModel.GetTxnTypes(), m.CmdGoalsModel.GetSelectedType()).
+			SetFields(m.CmdGoalsModel.GetBuilder().RenderFields()).
+			SetOutput(m.CmdGoalsModel.GetOutput())
+
+		// Check if dimensions are valid
+		if !m.cmdGoalsLayout.IsValid() {
+			return m.cmdGoalsLayout.RenderError()
+		}
+
+		// Render
+		return m.cmdGoalsLayout.Render()
 
 	case ExploreView:
 		return m.layoutContainer.Render(m.ExploreModel.View())

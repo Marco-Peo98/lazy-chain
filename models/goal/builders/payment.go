@@ -3,161 +3,264 @@ package builders
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"lazychain/models/goal/components"
 	goal "lazychain/models/goal/iface"
 )
 
-// PaymentBuilder maps to `goal clerk send`.
-// Flags reference: https://developer.algorand.org/docs/clis/goal/clerk/send/
+// PaymentBuilder implements payment transaction (pay)
 type PaymentBuilder struct {
-	fields []*components.Field
-	idx    int
+	// Required fields
+	sender   string
+	receiver string
+	amount   string
 
-	status string
+	// Optional fields
+	feeAuto         bool
+	validRoundsAuto bool
+	note            string
 
-	// plumbed in by host model:
-	RunWith func(argv []string)
+	// State
+	status  string
+	runFunc goal.RunFunc
 }
 
 func NewPaymentBuilder() *PaymentBuilder {
 	return &PaymentBuilder{
-		fields: []*components.Field{
-			{Label: "From (-f)", Hint: "address (or default)", Active: true},
-			{Label: "To (-t)", Hint: "recipient address"},
-			{Label: "Amount μAlgos (-a)", Hint: "e.g. 1000000 = 1 Algo"},
-			{Label: "Fee μAlgos (--fee)", Hint: "optional; empty for suggested"},
-			{Label: "FirstValid (--firstvalid)", Hint: "optional"},
-			{Label: "LastValid (--lastvalid)", Hint: "optional"},
-			{Label: "Note (-n)", Hint: "plain text note (optional)"},
-			{Label: "Out file (-o)", Hint: "write txn to file (optional)"},
-			{Label: "Sign (-s)", Hint: "true/false, with -o", },
-			{Label: "No Wait (-N)", Hint: "true/false"},
-			{Label: "Rekey (--rekey-to)", Hint: "optional"},
-		},
+		feeAuto:         true, // Default: auto
+		validRoundsAuto: true, // Default: auto
 	}
 }
 
-func (p *PaymentBuilder) Title() string { return "Payment (goal clerk send)" }
-func (p *PaymentBuilder) Init() tea.Cmd { return nil }
+// SetRunFunc sets the run function (called by GOALModel)
+func (b *PaymentBuilder) SetRunFunc(fn goal.RunFunc) {
+	b.runFunc = fn
+}
 
-func (p *PaymentBuilder) Validate() error {
-	to := p.fields[1].Value
-	amt := p.fields[2].Value
-	if strings.TrimSpace(to) == "" {
-		return errors.New("recipient (-t) is required")
-	}
-	if _, err := strconv.ParseUint(strings.TrimSpace(amt), 10, 64); err != nil {
-		return errors.New("amount (-a) must be a positive integer μAlgos")
-	}
+// Title returns the builder title
+func (b *PaymentBuilder) Title() string {
+	return "Payment (pay)"
+}
+
+// TxnType returns the transaction type identifier
+func (b *PaymentBuilder) TxnType() string {
+	return "pay"
+}
+
+// Init initializes the builder
+func (b *PaymentBuilder) Init() tea.Cmd {
 	return nil
 }
 
-func (p *PaymentBuilder) Args() []string {
-	f := func(i int) string { return strings.TrimSpace(p.fields[i].Value) }
-	var argv []string
-	argv = append(argv, "clerk", "send")
-	if v := f(0); v != "" { argv = append(argv, "-f", v) }
-	argv = append(argv, "-t", f(1))
-	argv = append(argv, "-a", f(2))
-	if v := f(3); v != "" { argv = append(argv, "--fee", v) }
-	if v := f(4); v != "" { argv = append(argv, "--firstvalid", v) }
-	if v := f(5); v != "" { argv = append(argv, "--lastvalid", v) }
-	if v := f(6); v != "" { argv = append(argv, "-n", v) }
-	if v := f(7); v != "" { argv = append(argv, "-o", v) }
-	if strings.EqualFold(f(8), "true") { argv = append(argv, "-s") }
-	if strings.EqualFold(f(9), "true") { argv = append(argv, "-N") }
-	if v := f(10); v != "" { argv = append(argv, "--rekey-to", v) }
-	return argv
+// Validate checks if required fields are filled
+func (b *PaymentBuilder) Validate() error {
+	if strings.TrimSpace(b.sender) == "" {
+		return errors.New("sender is required")
+	}
+	if strings.TrimSpace(b.receiver) == "" {
+		return errors.New("receiver is required")
+	}
+	if strings.TrimSpace(b.amount) == "" {
+		return errors.New("amount is required")
+	}
+	// TODO: Add more validation (address format, amount numeric, etc.)
+	return nil
 }
 
-func (p *PaymentBuilder) AfterRun(stdout, stderr string, runErr error) {
+// Args builds the command arguments
+func (b *PaymentBuilder) Args() []string {
+	// This is a placeholder - will be implemented properly with actual goal command
+	var args []string
+	args = append(args, "clerk", "send")
+	args = append(args, "-f", strings.TrimSpace(b.sender))
+	args = append(args, "-t", strings.TrimSpace(b.receiver))
+	args = append(args, "-a", strings.TrimSpace(b.amount))
+
+	if b.note != "" {
+		args = append(args, "-n", b.note)
+	}
+
+	// TODO: Add fee and valid rounds handling
+
+	return args
+}
+
+// AfterRun is called after command execution
+func (b *PaymentBuilder) AfterRun(stdout, stderr string, runErr error) {
 	if runErr != nil {
-		p.status = fmt.Sprintf("Error: %v\n%s", runErr, strings.TrimSpace(stderr))
+		b.status = fmt.Sprintf("Error: %v\n%s", runErr, strings.TrimSpace(stderr))
 		return
 	}
-	p.status = strings.TrimSpace(stdout)
+	b.status = strings.TrimSpace(stdout)
 }
 
-func (p *PaymentBuilder) Update(msg tea.Msg) (goal.Builder, tea.Cmd) {
-	switch m := msg.(type) {
+// Update handles user input
+func (b *PaymentBuilder) Update(msg tea.Msg) (goal.Builder, tea.Cmd) {
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch m.String() {
-		case "tab", "down":
-			p.fields[p.idx].Active = false
-			p.idx = (p.idx + 1) % len(p.fields)
-			p.fields[p.idx].Active = true
-		case "shift+tab", "up":
-			p.fields[p.idx].Active = false
-			p.idx = (p.idx - 1 + len(p.fields)) % len(p.fields)
-			p.fields[p.idx].Active = true
-		case "left":
-			p.fields[p.idx].MoveLeft()
-		case "right":
-			p.fields[p.idx].MoveRight()
-		case "backspace":
-			p.fields[p.idx].Backspace()
+		switch msg.String() {
 		case "enter":
-			// run command
-			if err := p.Validate(); err != nil {
-				p.status = "Validation: " + err.Error()
-				return p, nil
+			// Execute command
+			if err := b.Validate(); err != nil {
+				b.status = "Validation Error: " + err.Error()
+				return b, nil
 			}
-			if p.RunWith != nil {
-				p.RunWith(p.Args())
-			}
-		}
-		// typing
-		if m.Type == tea.KeyRunes {
-			for _, r := range m.Runes {
-				p.fields[p.idx].InsertRune(r)
+			if b.runFunc != nil {
+				b.runFunc(b.Args())
 			}
 		}
+		// TODO: Handle field navigation and input
 	}
-	return p, nil
+	return b, nil
 }
 
-func (p *PaymentBuilder) View() string {
-	left := []string{
-		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#cba6f7")).Render(p.Title()),
-		"",
-	}
-	for _, f := range p.fields {
-		left = append(left, f.Render(36))
-		left = append(left, "")
-	}
-	leftPanel := lipgloss.NewStyle().
-		Width(44).
-		Padding(1).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#89b4fa")).
-		Render(stringsJoin(left))
+// RenderFields renders the fields panel (NEW - separated from output)
+func (b *PaymentBuilder) RenderFields() string {
+	var lines []string
 
-	right := []string{
-		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#a6e3a1")).Render("Output"),
-		"",
-		strings.TrimSpace(p.status),
-	}
-	rightPanel := lipgloss.NewStyle().
-		Width(44).
-		Padding(1).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#a6e3a1")).
-		Render(stringsJoin(right))
+	// Title
+	title := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#cba6f7")).
+		Render("Payment Transaction")
+	lines = append(lines, title)
+	lines = append(lines, "")
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, "  ", rightPanel)
+	// Required fields section
+	reqHeader := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#89b4fa")).
+		Render("Required Fields:")
+	lines = append(lines, reqHeader)
+	lines = append(lines, "")
+
+	// Sender (placeholder)
+	senderLabel := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#cdd6f4")).
+		Render("Sender:")
+	senderValue := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6e3a1")).
+		Render(b.getDisplayValue(b.sender, "[address]"))
+	lines = append(lines, "  "+senderLabel)
+	lines = append(lines, "    "+senderValue)
+	lines = append(lines, "")
+
+	// Receiver (placeholder)
+	receiverLabel := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#cdd6f4")).
+		Render("Receiver:")
+	receiverValue := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6e3a1")).
+		Render(b.getDisplayValue(b.receiver, "[address]"))
+	lines = append(lines, "  "+receiverLabel)
+	lines = append(lines, "    "+receiverValue)
+	lines = append(lines, "")
+
+	// Amount (placeholder)
+	amountLabel := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#cdd6f4")).
+		Render("Amount (μAlgos):")
+	amountValue := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6e3a1")).
+		Render(b.getDisplayValue(b.amount, "[amount]"))
+	lines = append(lines, "  "+amountLabel)
+	lines = append(lines, "    "+amountValue)
+	lines = append(lines, "")
+
+	// Optional fields section
+	optHeader := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#f9e2af")).
+		Render("Optional Fields:")
+	lines = append(lines, optHeader)
+	lines = append(lines, "")
+
+	// Fee auto
+	feeLabel := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#cdd6f4")).
+		Render("Set fee automatically:")
+	feeValue := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6e3a1")).
+		Render(b.getBoolDisplay(b.feeAuto))
+	lines = append(lines, "  "+feeLabel)
+	lines = append(lines, "    "+feeValue)
+	lines = append(lines, "")
+
+	// Valid rounds auto
+	validLabel := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#cdd6f4")).
+		Render("Set valid rounds automatically:")
+	validValue := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6e3a1")).
+		Render(b.getBoolDisplay(b.validRoundsAuto))
+	lines = append(lines, "  "+validLabel)
+	lines = append(lines, "    "+validValue)
+	lines = append(lines, "")
+
+	// Note
+	noteLabel := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#cdd6f4")).
+		Render("Note:")
+	noteValue := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6e3a1")).
+		Render(b.getDisplayValue(b.note, "[optional note]"))
+	lines = append(lines, "  "+noteLabel)
+	lines = append(lines, "    "+noteValue)
+	lines = append(lines, "")
+
+	// Instructions
+	instrStyle := lipgloss.NewStyle().
+		Italic(true).
+		Foreground(lipgloss.Color("#6c7086"))
+	lines = append(lines, instrStyle.Render("Enter: Execute transaction"))
+	lines = append(lines, instrStyle.Render("(Field editing coming soon)"))
+
+	return strings.Join(lines, "\n")
 }
 
-func stringsJoin(ss []string) string {
-	var b strings.Builder
-	for i, s := range ss {
-		if i > 0 { b.WriteString("\n") }
-		b.WriteString(s)
+// RenderOutput renders the output panel (NEW - separated from fields)
+func (b *PaymentBuilder) RenderOutput() string {
+	if b.status == "" {
+		style := lipgloss.NewStyle().
+			Italic(true).
+			Foreground(lipgloss.Color("#6c7086"))
+		return style.Render("No output yet.\nConfigure fields and press Enter to execute.")
 	}
-	return b.String()
+
+	// Check if it's an error
+	if strings.HasPrefix(b.status, "Error") || strings.HasPrefix(b.status, "Validation Error") {
+		style := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#f38ba8"))
+		return style.Render(b.status)
+	}
+
+	// Success output
+	style := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#a6e3a1"))
+	return style.Render(b.status)
+}
+
+// View returns the complete view (delegates to RenderFields for compatibility)
+func (b *PaymentBuilder) View() string {
+	return b.RenderFields()
+}
+
+// Helper functions
+func (b *PaymentBuilder) getDisplayValue(value, placeholder string) string {
+	if strings.TrimSpace(value) == "" {
+		return lipgloss.NewStyle().
+			Faint(true).
+			Render(placeholder)
+	}
+	return value
+}
+
+func (b *PaymentBuilder) getBoolDisplay(value bool) string {
+	if value {
+		return "✓ Yes"
+	}
+	return "✗ No"
 }

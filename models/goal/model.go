@@ -7,122 +7,194 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 
 	"lazychain/models/goal/builders"
-	"lazychain/models/goal/components"
 )
 
 type GOALModel struct {
-	nav     components.ListNav
-	builder Builder
-	runner  *Runner
+	// Transaction type selection
+	txnTypes     []string
+	selectedType int
 
-	builders []Builder
-	output   string
-	errLine  string
+	// Active builder
+	builder  Builder
+	builders map[string]Builder
+
+	// Command execution
+	runner *Runner
+	output string
+	errMsg string
+
+	// UI state
+	focusOnBuilder bool // true = fields, false = txn types
 }
 
 func NewGOALModel() *GOALModel {
 	m := &GOALModel{
-		runner: NewRunner(),
-	}
-	// Left menu
-	m.nav = components.ListNav{
-		Title: "GOAL: Transaction Builder",
-		Items: []string{
-			"Payment (clerk send)",
-			"ASA Transfer (asset send)",
-			"App Call (app call/method)",
-			"Atomic Group (clerk group)",
-			"Sign / Send (clerk sign/rawsend)",
-			"Inspect / Simulate",
-		},
-		Active: true,
-		Width:  28,
+		runner:         NewRunner(),
+		focusOnBuilder: false,
+		builders:       make(map[string]Builder),
 	}
 
-	// Builders
-	pay := builders.NewPaymentBuilder()
-	pay.RunWith = m.run
+	// Transaction types list
+	m.txnTypes = []string{
+		"Payment (pay)",
+		"Application Call (appl)",
+		"Asset Transfer (axfer)",
+		"Asset Create (acfg)",
+		"Asset Freeze (afrz)",
+		"Key Registration (keyreg)",
+	}
 
-	asa := builders.NewAssetTransferBuilder()
-	asa.RunWith = m.run
+	// Initialize all builders
+	m.initBuilders()
 
-	app := builders.NewAppCallBuilder()
-	app.RunWith = m.run
+	// Set first builder as active
+	m.builder = m.builders["pay"]
 
-	group := builders.NewGroupBuilder()
-	group.RunWith = m.run
-
-	sign := builders.NewSignSendBuilder()
-	sign.RunWith = m.run
-
-	ins := builders.NewInspectSimBuilder()
-	ins.RunWith = m.run
-
-	m.builders = []Builder{pay, asa, app, group, sign, ins}
-	m.builder = m.builders[0]
 	return m
 }
 
-func (m *GOALModel) Init() tea.Cmd { return m.builder.Init() }
+func (m *GOALModel) initBuilders() {
+	// Payment
+	pay := builders.NewPaymentBuilder()
+	pay.SetRunFunc(m.run)
+	m.builders["pay"] = pay
+
+	// Application Call
+	appl := builders.NewApplicationCallBuilder()
+	appl.SetRunFunc(m.run)
+	m.builders["appl"] = appl
+
+	// Asset Transfer
+	axfer := builders.NewAssetTransferBuilder()
+	axfer.SetRunFunc(m.run)
+	m.builders["axfer"] = axfer
+
+	// Asset Create
+	acfg := builders.NewAssetCreateBuilder()
+	acfg.SetRunFunc(m.run)
+	m.builders["acfg"] = acfg
+
+	// Asset Freeze
+	afrz := builders.NewAssetFreezeBuilder()
+	afrz.SetRunFunc(m.run)
+	m.builders["afrz"] = afrz
+
+	// Key Registration
+	keyreg := builders.NewKeyRegistrationBuilder()
+	keyreg.SetRunFunc(m.run)
+	m.builders["keyreg"] = keyreg
+}
+
+func (m *GOALModel) Init() tea.Cmd {
+	return m.builder.Init()
+}
 
 func (m *GOALModel) run(argv []string) {
-	// fire and wait (no background work; we execute synchronously here)
 	_ = m.runner.CheckBinary()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
 	res := m.runner.Run(ctx, argv)
 	m.output = strings.TrimSpace(res.Stdout)
+
 	if res.Err != nil {
 		if m.output == "" {
-			m.errLine = fmt.Sprintf("error: %v\n%s", res.Err, strings.TrimSpace(res.Stderr))
+			m.errMsg = fmt.Sprintf("Error: %v\n%s", res.Err, strings.TrimSpace(res.Stderr))
 		} else {
-			m.errLine = fmt.Sprintf("error: %v", res.Err)
+			m.errMsg = fmt.Sprintf("Error: %v", res.Err)
 		}
+	} else {
+		m.errMsg = ""
 	}
+
 	m.builder.AfterRun(res.Stdout, res.Stderr, res.Err)
 }
 
 func (m *GOALModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch t := msg.(type) {
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch t.String() {
-		case "ctrl+c", "esc":
-			return m, tea.Quit
-		case "up":
-			m.nav.Up()
-			m.builder = m.builders[m.nav.Cursor]
-			return m, nil
-		case "down":
-			m.nav.Down()
-			m.builder = m.builders[m.nav.Cursor]
-			return m, nil
+		// ESC always handled by parent (main.go)
+
+		if !m.focusOnBuilder {
+			// Focus on transaction type list
+			switch msg.String() {
+			case "up", "k":
+				if m.selectedType > 0 {
+					m.selectedType--
+					m.switchBuilder()
+				}
+			case "down", "j":
+				if m.selectedType < len(m.txnTypes)-1 {
+					m.selectedType++
+					m.switchBuilder()
+				}
+			case "enter", "tab", "right":
+				// Switch focus to builder
+				m.focusOnBuilder = true
+			}
+		} else {
+			// Focus on builder (fields)
+			switch msg.String() {
+			case "tab", "left":
+				// Switch focus back to txn types
+				m.focusOnBuilder = false
+			default:
+				// Delegate to builder
+				var cmd tea.Cmd
+				m.builder, cmd = m.builder.Update(msg)
+				return m, cmd
+			}
 		}
 	}
-	var cmd tea.Cmd
-	m.builder, cmd = m.builder.Update(msg)
-	return m, cmd
+
+	return m, nil
 }
 
-func (m *GOALModel) View() string {
-	left := m.nav.Render()
-	right := m.builder.View()
-	footer := m.renderFooter()
-	return lipgloss.JoinVertical(lipgloss.Left,
-		lipgloss.JoinHorizontal(lipgloss.Top, left, "  ", right),
-		"",
-		footer,
-	)
-}
-
-func (m *GOALModel) renderFooter() string {
-	info := []string{
-		"Tab/Shift+Tab or Up/Down: Navigate fields",
-		"Enter: Run command",
-		"ESC/Ctrl+C: Close",
+func (m *GOALModel) switchBuilder() {
+	// Map selectedType to builder key
+	typeMap := map[int]string{
+		0: "pay",
+		1: "appl",
+		2: "axfer",
+		3: "acfg",
+		4: "afrz",
+		5: "keyreg",
 	}
-	line := strings.Join(info, " | ")
-	return lipgloss.NewStyle().Faint(true).Render(line)
+
+	if key, exists := typeMap[m.selectedType]; exists {
+		m.builder = m.builders[key]
+		m.output = ""
+		m.errMsg = ""
+	}
+}
+
+// View will be replaced by CmdGoalsLayout, but kept for now
+func (m *GOALModel) View() string {
+	return "GOALModel - Use CmdGoalsLayout to render"
+}
+
+// Public methods for layout to access data
+func (m *GOALModel) GetTxnTypes() []string {
+	return m.txnTypes
+}
+
+func (m *GOALModel) GetSelectedType() int {
+	return m.selectedType
+}
+
+func (m *GOALModel) GetBuilder() Builder {
+	return m.builder
+}
+
+func (m *GOALModel) GetOutput() string {
+	if m.errMsg != "" {
+		return m.errMsg
+	}
+	return m.output
+}
+
+func (m *GOALModel) IsFocusOnBuilder() bool {
+	return m.focusOnBuilder
 }
