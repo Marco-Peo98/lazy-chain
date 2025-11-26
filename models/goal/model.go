@@ -115,8 +115,6 @@ func (m *GOALModel) run(argv []string) {
 func (m *GOALModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// ESC always handled by parent (main.go)
-
 		if !m.focusOnBuilder {
 			// Focus on transaction type list
 			switch msg.String() {
@@ -134,11 +132,29 @@ func (m *GOALModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Switch focus to builder
 				m.focusOnBuilder = true
 			}
+			// Note: ESC when focus on txn types is handled by main.go (exits to ProjectView)
 		} else {
 			// Focus on builder (fields)
 			switch msg.String() {
 			case "tab", "left":
-				// Switch focus back to txn types
+				// Only switch back if not editing
+				if !m.builder.IsEditing() {
+					m.focusOnBuilder = false
+				} else {
+					// If editing, delegate to builder
+					var cmd tea.Cmd
+					m.builder, cmd = m.builder.Update(msg)
+					return m, cmd
+				}
+			case "esc":
+				// If editing, let builder handle it (cancel edit)
+				// If not editing, switch focus back to txn types
+				if m.builder.IsEditing() {
+					var cmd tea.Cmd
+					m.builder, cmd = m.builder.Update(msg)
+					return m, cmd
+				}
+				// Not editing, switch focus back to txn types
 				m.focusOnBuilder = false
 			default:
 				// Delegate to builder
@@ -197,4 +213,11 @@ func (m *GOALModel) GetOutput() string {
 
 func (m *GOALModel) IsFocusOnBuilder() bool {
 	return m.focusOnBuilder
+}
+
+// CanExit returns true if ESC should exit to the previous screen
+// Returns false if ESC should be handled internally (e.g., to cancel editing or switch focus)
+func (m *GOALModel) CanExit() bool {
+	// Can only exit when focus is on transaction types list (not on builder/fields)
+	return !m.focusOnBuilder
 }

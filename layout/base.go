@@ -26,6 +26,8 @@ var (
 	BorderColorAccent    = lipgloss.Color("#cba6f7") // Mauve
 	BorderColorWarning   = lipgloss.Color("#f9e2af") // Yellow
 	BorderColorError     = lipgloss.Color("#f38ba8") // Red
+	BorderColorFocused   = lipgloss.Color("#f5c2e7") // Pink - for active/focused panels
+	BorderColorInactive  = lipgloss.Color("#6c7086") // Overlay0 - for inactive panels
 
 	// Text colors
 	TextColorPrimary   = lipgloss.Color("#cdd6f4") // Text

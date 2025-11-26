@@ -268,7 +268,7 @@ func (l *ProjectLayout) renderMenuContent(maxX, maxY int) string {
 		Padding(1).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(BorderColorPrimary).
-		Background(lipgloss.Color("#1e3a5f")). // Dark blue background JUST FOR DEBUG
+		// Background(lipgloss.Color("#1e3a5f")). // Dark blue background JUST FOR DEBUG
 		Render(panelContent)
 }
 
@@ -353,7 +353,7 @@ func (l *ProjectLayout) renderPreviewContent(maxX, maxY int) string {
 		Padding(1).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(BorderColorSecondary).
-		Background(lipgloss.Color("#1e3d2f")). // Dark green background JUST FOR DEBUG
+		// Background(lipgloss.Color("#1e3d2f")). // Dark green background JUST FOR DEBUG
 		Render(panelContent)
 }
 

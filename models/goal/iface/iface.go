@@ -1,29 +1,34 @@
 package iface
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	tea "github.com/charmbracelet/bubbletea"
+)
 
-// RunFunc lets the host model execute a goal command with argv.
-type RunFunc func(argv []string)
+// RunFunc is the type signature for the function that actually runs the command.
+type RunFunc func(args []string)
 
-// Builder is the interface every TUI builder implements.
+// Builder is the interface for a transaction type builder.
 type Builder interface {
-	// Identification
+	// Transaction metadata
 	Title() string
 	TxnType() string
 
 	// Lifecycle
 	Init() tea.Cmd
-	Update(tea.Msg) (Builder, tea.Cmd)
-
-	// Rendering
-	RenderFields() string // Fields panel content
-	RenderOutput() string // Output panel content
-
-	// Legacy kept for compatibility
-	View() string
-
-	// Validation and Execution
+	Update(msg tea.Msg) (Builder, tea.Cmd)
 	Validate() error
 	Args() []string
 	AfterRun(stdout, stderr string, runErr error)
+
+	// State
+	SetRunFunc(fn RunFunc)
+	IsEditing() bool
+
+	// Layout integration
+	SetAvailableHeight(lines int) // Sets available height in terminal lines for viewport calculation
+
+	// Rendering
+	RenderFields() string
+	RenderOutput() string
+	View() string
 }

@@ -148,8 +148,12 @@ func (m *MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case CmdGoalsView:
 			switch msg.String() {
 			case "esc":
-				m.CurrentState = ProjectView
-				return m, nil
+				// Only exit if GOALModel says it's OK (focus is on txn types, not editing)
+				if m.CmdGoalsModel.CanExit() {
+					m.CurrentState = ProjectView
+					return m, nil
+				}
+				// Otherwise, let GOALModel handle it (cancel edit or switch focus)
 			}
 			var cmd tea.Cmd
 			updatedModel, cmd := m.CmdGoalsModel.Update(msg)
@@ -254,16 +258,26 @@ func (m *MainModel) View() string {
 			m.cmdGoalsLayout = layout.NewCmdGoalsLayout(m.width, m.height)
 		}
 
-		// Configure layout with data from GOALModel
-		m.cmdGoalsLayout.
-			SetTxnTypes(m.CmdGoalsModel.GetTxnTypes(), m.CmdGoalsModel.GetSelectedType()).
-			SetFields(m.CmdGoalsModel.GetBuilder().RenderFields()).
-			SetOutput(m.CmdGoalsModel.GetOutput())
+		// Update layout dimensions (in case window was resized)
+		m.cmdGoalsLayout.Update(m.width, m.height)
 
-		// Check if dimensions are valid
+		// Set txnTypes first so GetMinDimensions can calculate properly
+		m.cmdGoalsLayout.SetTxnTypes(m.CmdGoalsModel.GetTxnTypes(), m.CmdGoalsModel.GetSelectedType())
+
+		// FIRST: Check if dimensions are valid BEFORE any rendering
 		if !m.cmdGoalsLayout.IsValid() {
 			return m.cmdGoalsLayout.RenderError()
 		}
+
+		// Only configure viewport and render if we have enough space
+		availableHeight := m.cmdGoalsLayout.GetAvailableFieldsHeight()
+		m.CmdGoalsModel.GetBuilder().SetAvailableHeight(availableHeight)
+
+		// Configure remaining layout data including focus state
+		m.cmdGoalsLayout.
+			SetFocus(m.CmdGoalsModel.IsFocusOnBuilder()).
+			SetFields(m.CmdGoalsModel.GetBuilder().RenderFields()).
+			SetOutput(m.CmdGoalsModel.GetOutput())
 
 		// Render
 		return m.cmdGoalsLayout.Render()
